@@ -1030,6 +1030,10 @@ validate_var(?use_multi_keys, Value) ->
         _ -> throw({error, {invalid_multi_keys, Value}})
     end;
 
+validate_var(?assert_loc_txn_ver, Value) ->
+    %% Allowed assert location txn version(s)
+    validate_int(Value, "assert_loc_txn_ver", 1, 10, false);
+
 validate_var(Var, Value) ->
     %% something we don't understand, crash
     invalid_var(Var, Value).

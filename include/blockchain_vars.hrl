@@ -360,3 +360,7 @@
 
 %% Multi-key
 -define(use_multi_keys, use_multi_keys).
+
+%% ------------------------------------------------------------------
+%% assert location txn version
+-define(assert_loc_txn_ver, assert_loc_txn_ver).

@@ -37,7 +37,7 @@
   0},
  {<<"helium_proto">>,
   {git,"https://github.com/helium/proto.git",
-       {ref,"9d604b5908ab6084676d3b6e4819792b0c11bc0e"}},
+       {ref,"40e0d9dd46565dcc51c97a04ce13c109ebe9b1c8"}},
   0},
  {<<"inert">>,
   {git,"https://github.com/msantos/inert",
