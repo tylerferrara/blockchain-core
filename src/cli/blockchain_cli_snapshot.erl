@@ -22,11 +22,11 @@ register_all_usage() ->
                   end,
                   [
                    snapshot_take_usage(),
-                   snapshot_load_usage(),
+                   snapshot_load_file_usage(),
                    snapshot_diff_usage(),
                    snapshot_info_usage(),
                    snapshot_list_usage(),
-                   snapshot_resync_usage(),
+                   snapshot_load_height_usage(),
                    snapshot_usage()
                   ]).
 
@@ -36,11 +36,11 @@ register_all_cmds() ->
                   end,
                   [
                    snapshot_take_cmd(),
-                   snapshot_load_cmd(),
+                   snapshot_load_file_cmd(),
                    snapshot_diff_cmd(),
                    snapshot_info_cmd(),
                    snapshot_list_cmd(),
-                   snapshot_resync_cmd(),
+                   snapshot_load_height_cmd(),
                    snapshot_cmd()
                   ]).
 %%
@@ -50,12 +50,12 @@ register_all_cmds() ->
 snapshot_usage() ->
     [["snapshot"],
      ["blockchain snapshot commands\n\n",
-      "  snapshot take   - Take a snapshot at the current ledger height.\n",
-      "  snapshot load   - Load a snapshot from a file.\n"
-      "  snapshot diff   - Load two snapshots from files and find changes.\n"
-      "  snapshot info   - Show information about a snapshot in a file.\n"
-      "  snapshot list   - Show information about the last 5 snapshots.\n"
-      "  snapshot resync - Resync from given snapshot block height.\n"
+      "  snapshot take          - Take a snapshot at the current ledger height.\n",
+      "  snapshot load-file     - Load a snapshot from a file.\n"
+      "  snapshot diff          - Load two snapshots from files and find changes.\n"
+      "  snapshot info          - Show information about a snapshot in a file.\n"
+      "  snapshot list          - Show information about the last 5 snapshots.\n"
+      "  snapshot load-height   - Load a snapshot from given block height.\n"
      ]
     ].
 
@@ -94,21 +94,21 @@ snapshot_take(Filename) ->
     {ok, BinSnap} = blockchain_ledger_snapshot_v1:serialize(Snapshot),
     file:write_file(Filename, BinSnap).
 
-snapshot_load_cmd() ->
+snapshot_load_file_cmd() ->
     [
-     [["snapshot", "load", '*'], [], [], fun snapshot_load/3]
+     [["snapshot", "load-file", '*'], [], [], fun snapshot_load_file/3]
     ].
 
-snapshot_load_usage() ->
-    [["snapshot", "load"],
-     ["blockchain snapshot load <filename>\n\n",
+snapshot_load_file_usage() ->
+    [["snapshot", "load-file"],
+     ["blockchain snapshot load-file <filename>\n\n",
       "  Take a ledger snapshot at the current height and write it to filename\n"]
     ].
 
-snapshot_load(["snapshot", "load", Filename], [], []) ->
+snapshot_load_file(["snapshot", "load-file", Filename], [], []) ->
     Ret = snapshot_load(Filename),
     [clique_status:text(io_lib:format("~p", [Ret]))];
-snapshot_load(_, _, _) ->
+snapshot_load_file(_, _, _) ->
     usage.
 
 snapshot_load(Filename) ->
@@ -188,25 +188,34 @@ snapshot_list(["snapshot", "list"], [], []) ->
 snapshot_list(_, _, _) ->
     usage.
 
-snapshot_resync_cmd() ->
+snapshot_load_height_cmd() ->
     [
-     [["snapshot", "resync", '*'], [], [], fun snapshot_resync/3],
-     [["snapshot", "resync", '*'], [],
+     [["snapshot", "load-height"], [], [], fun snapshot_load_height/3],
+     [["snapshot", "load-height", '*'], [], [], fun snapshot_load_height/3],
+     [["snapshot", "load-height", '*'], [],
       [{revalidate, [{shortname, "r"}, {longname, "revalidate"}]}],
-      fun snapshot_resync/3]
+      fun snapshot_load_height/3]
     ].
 
-snapshot_resync_usage() ->
-    [["snapshot", "resync"],
-     ["snapshot resync <block_height> [-r]\n\n",
-      "  Take a snapshot and resync from given <block_height>\n"
+snapshot_load_height_usage() ->
+    [["snapshot", "load-height"],
+     ["snapshot load-height <block_height> [-r]\n\n",
+      "  Take a snapshot and load-height from given <block_height>\n"
       "Options\n\n",
       "  -r, --revalidate\n",
-      "    Take a snapshot and resync from given <block_height> with revalidation\n"
+      "    Take a snapshot and load-height from given <block_height> with revalidation\n"
      ]
     ].
 
-snapshot_resync(["snapshot", "resync", BH], [], []) ->
+snapshot_load_height(["snapshot", "load-height"], [], []) ->
+    Chain = blockchain_worker:blockchain(),
+    Ledger = blockchain:ledger(Chain),
+    Blocks = blockchain_ledger_snapshot_v1:get_blocks(Chain),
+    {ok, Snapshot} = blockchain_ledger_snapshot_v1:snapshot(Ledger, Blocks),
+    Hash = blockchain_ledger_snapshot_v1:hash(Snapshot),
+    ok = blockchain_worker:install_snapshot(Hash, Snapshot),
+    [clique_status:text(io_lib:format("Loading snapshot from latest block\n", []))];
+snapshot_load_height(["snapshot", "load-height", BH], [], []) ->
     Chain = blockchain_worker:blockchain(),
     {ok, Block} = blockchain:get_block(BH, Chain),
     case blockchain_block_v1:snapshot_hash(Block) of
@@ -216,9 +225,9 @@ snapshot_resync(["snapshot", "resync", BH], [], []) ->
         Hash ->
             {ok, Snap} = blockchain:get_snapshot(Hash, Chain),
             ok = blockchain_worker:install_snapshot(Hash, Snap),
-            [clique_status:text(io_lib:format("Resyncing from snapshot block: ~p\n", [BH]))]
+            [clique_status:text(io_lib:format("Loading snapshot from block_height: ~p\n", [BH]))]
     end;
-snapshot_resync(["snapshot", "resync", BH], [], [{revalidate, _}]) ->
+snapshot_load_height(["snapshot", "load-height", BH], [], [{revalidate, _}]) ->
     Chain = blockchain_worker:blockchain(),
     {ok, Block} = blockchain:get_block(BH, Chain),
     case blockchain_block_v1:snapshot_hash(Block) of
@@ -230,7 +239,7 @@ snapshot_resync(["snapshot", "resync", BH], [], [{revalidate, _}]) ->
             ok = blockchain_worker:pause_sync(),
             {ok, Snap} = blockchain:get_snapshot(Hash, Chain),
             ok = blockchain_worker:install_snapshot(Hash, Snap),
-            [clique_status:text(io_lib:format("Resyncing from snapshot block: ~p\n", [BH]))]
+            [clique_status:text(io_lib:format("Loading snapshot from block_height: ~p with re-validation\n", [BH]))]
     end;
-snapshot_resync(_CmdBase, [], []) ->
+snapshot_load_height(_CmdBase, [], []) ->
     usage.
