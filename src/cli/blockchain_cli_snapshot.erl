@@ -209,12 +209,10 @@ snapshot_load_height_usage() ->
 
 snapshot_load_height(["snapshot", "load-height"], [], []) ->
     Chain = blockchain_worker:blockchain(),
-    Ledger = blockchain:ledger(Chain),
-    Blocks = blockchain_ledger_snapshot_v1:get_blocks(Chain),
-    {ok, Snapshot} = blockchain_ledger_snapshot_v1:snapshot(Ledger, Blocks),
-    Hash = blockchain_ledger_snapshot_v1:hash(Snapshot),
-    ok = blockchain_worker:install_snapshot(Hash, Snapshot),
-    [clique_status:text(io_lib:format("Loading snapshot from latest block\n", []))];
+    {Height, _BlockHash, SnapHash} = hd(blockchain:find_last_snapshots(Chain, 1)),
+    {ok, Snapshot} = blockchain:get_snapshot(SnapHash, Chain),
+    ok = blockchain_worker:install_snapshot(SnapHash, Snapshot),
+    [clique_status:text(io_lib:format("Loading snapshot from latest available block: ~p\n", [Height]))];
 snapshot_load_height(["snapshot", "load-height", BH], [], []) ->
     Chain = blockchain_worker:blockchain(),
     {ok, Block} = blockchain:get_block(list_to_integer(BH), Chain),
