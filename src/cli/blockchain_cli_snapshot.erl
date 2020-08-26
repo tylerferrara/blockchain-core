@@ -26,6 +26,7 @@ register_all_usage() ->
                    snapshot_diff_usage(),
                    snapshot_info_usage(),
                    snapshot_list_usage(),
+                   snapshot_resync_usage(),
                    snapshot_usage()
                   ]).
 
@@ -39,6 +40,7 @@ register_all_cmds() ->
                    snapshot_diff_cmd(),
                    snapshot_info_cmd(),
                    snapshot_list_cmd(),
+                   snapshot_resync_cmd(),
                    snapshot_cmd()
                   ]).
 %%
@@ -53,6 +55,7 @@ snapshot_usage() ->
       "  snapshot diff   - Load two snapshots from files and find changes.\n"
       "  snapshot info   - Show information about a snapshot in a file.\n"
       "  snapshot list   - Show information about the last 5 snapshots.\n"
+      "  snapshot resync - Resync from given snapshot block height.\n"
      ]
     ].
 
@@ -183,4 +186,51 @@ snapshot_list(["snapshot", "list"], [], []) ->
             [ clique_status:text(io_lib:format("Height ~p\nHash ~p\nHave ~p\n", [Height, Hash, element(1, blockchain:get_snapshot(Hash, Chain)) == ok])) || {Height, _, Hash} <- Snapshots ]
     end;
 snapshot_list(_, _, _) ->
+    usage.
+
+snapshot_resync_cmd() ->
+    [
+     [["snapshot", "resync", '*'], [], [], fun snapshot_resync/3],
+     [["snapshot", "resync", '*'], [],
+      [{revalidate, [{shortname, "r"}, {longname, "revalidate"}]}],
+      fun snapshot_resync/3]
+    ].
+
+snapshot_resync_usage() ->
+    [["snapshot", "resync"],
+     ["snapshot resync <block_height> [-r]\n\n",
+      "  Take a snapshot and resync from given <block_height>\n"
+      "Options\n\n",
+      "  -r, --revalidate\n",
+      "    Take a snapshot and resync from given <block_height> with revalidation\n"
+     ]
+    ].
+
+snapshot_resync(["snapshot", "resync", BH], [], []) ->
+    Chain = blockchain_worker:blockchain(),
+    {ok, Block} = blockchain:get_block(BH, Chain),
+    case blockchain_block_v1:snapshot_hash(Block) of
+        <<>> ->
+            Text = io_lib:format("No snapshot at block height: ~p", [BH]),
+            [clique_status:alert([clique_status:text(Text)])];
+        Hash ->
+            {ok, Snap} = blockchain:get_snapshot(Hash, Chain),
+            ok = blockchain_worker:install_snapshot(Hash, Snap),
+            [clique_status:text(io_lib:format("Resyncing from snapshot block: ~p\n", [BH]))]
+    end;
+snapshot_resync(["snapshot", "resync", BH], [], [{revalidate, _}]) ->
+    Chain = blockchain_worker:blockchain(),
+    {ok, Block} = blockchain:get_block(BH, Chain),
+    case blockchain_block_v1:snapshot_hash(Block) of
+        <<>> ->
+            Text = io_lib:format("No snapshot at block height: ~p", [BH]),
+            [clique_status:alert([clique_status:text(Text)])];
+        Hash ->
+            ok = application:set_env(blockchain, force_resync_validation, true),
+            ok = blockchain_worker:pause_sync(),
+            {ok, Snap} = blockchain:get_snapshot(Hash, Chain),
+            ok = blockchain_worker:install_snapshot(Hash, Snap),
+            [clique_status:text(io_lib:format("Resyncing from snapshot block: ~p\n", [BH]))]
+    end;
+snapshot_resync(_CmdBase, [], []) ->
     usage.
