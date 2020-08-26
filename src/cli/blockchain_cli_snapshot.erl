@@ -217,7 +217,7 @@ snapshot_load_height(["snapshot", "load-height"], [], []) ->
     [clique_status:text(io_lib:format("Loading snapshot from latest block\n", []))];
 snapshot_load_height(["snapshot", "load-height", BH], [], []) ->
     Chain = blockchain_worker:blockchain(),
-    {ok, Block} = blockchain:get_block(BH, Chain),
+    {ok, Block} = blockchain:get_block(list_to_integer(BH), Chain),
     case blockchain_block_v1:snapshot_hash(Block) of
         <<>> ->
             Text = io_lib:format("No snapshot at block height: ~p", [BH]),
@@ -229,7 +229,7 @@ snapshot_load_height(["snapshot", "load-height", BH], [], []) ->
     end;
 snapshot_load_height(["snapshot", "load-height", BH], [], [{revalidate, _}]) ->
     Chain = blockchain_worker:blockchain(),
-    {ok, Block} = blockchain:get_block(BH, Chain),
+    {ok, Block} = blockchain:get_block(list_to_integer(BH), Chain),
     case blockchain_block_v1:snapshot_hash(Block) of
         <<>> ->
             Text = io_lib:format("No snapshot at block height: ~p", [BH]),
