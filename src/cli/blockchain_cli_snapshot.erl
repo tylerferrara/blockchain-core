@@ -230,14 +230,25 @@ snapshot_load_from_height(BH) ->
             Text = io_lib:format("No snapshot at block height: ~p", [BH]),
             [clique_status:alert([clique_status:text(Text)])];
         Hash ->
-            {ok, Snap} = blockchain:get_snapshot(Hash, Chain),
-            ok = blockchain_worker:install_snapshot(Hash, Snap),
-            [clique_status:text(io_lib:format("Loading snapshot from block_height: ~p with re-validation\n", [BH]))]
+            case blockchain:get_snapshot(Hash, Chain) of
+                {ok, Snapshot} ->
+                    ok = blockchain_worker:install_snapshot(Hash, Snapshot),
+                    [clique_status:text(io_lib:format("Loading snapshot from block_height: ~p with re-validation\n", [BH]))];
+                {error, _} ->
+                    Text = io_lib:format("No local snapshot at block height: ~p", [BH]),
+                    [clique_status:alert([clique_status:text(Text)])]
+            end
     end.
 
 snapshot_load_latest_available() ->
     Chain = blockchain_worker:blockchain(),
     {Height, _BlockHash, SnapHash} = hd(blockchain:find_last_snapshots(Chain, 1)),
-    {ok, Snapshot} = blockchain:get_snapshot(SnapHash, Chain),
-    ok = blockchain_worker:install_snapshot(SnapHash, Snapshot),
-    [clique_status:text(io_lib:format("Loading snapshot from latest available block~p\n", [Height]))].
+
+    case blockchain:get_snapshot(SnapHash, Chain) of
+        {ok, Snapshot} ->
+            ok = blockchain_worker:install_snapshot(SnapHash, Snapshot),
+            [clique_status:text(io_lib:format("Loading snapshot from latest available block~p\n", [Height]))];
+        {error, _} ->
+            Text = io_lib:format("No local snapshot at block height: ~p", [Height]),
+            [clique_status:alert([clique_status:text(Text)])]
+    end.
