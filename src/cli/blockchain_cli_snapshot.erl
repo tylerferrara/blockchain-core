@@ -213,6 +213,14 @@ snapshot_load_height(["snapshot", "load-height"], [], []) ->
     {ok, Snapshot} = blockchain:get_snapshot(SnapHash, Chain),
     ok = blockchain_worker:install_snapshot(SnapHash, Snapshot),
     [clique_status:text(io_lib:format("Loading snapshot from latest available block: ~p\n", [Height]))];
+snapshot_load_height(["snapshot", "load-height"], [], [{revalidate, _}]) ->
+    ok = blockchain_worker:pause_sync(),
+    ok = application:set_env(blockchain, force_resync_validation, true),
+    Chain = blockchain_worker:blockchain(),
+    {Height, _BlockHash, SnapHash} = hd(blockchain:find_last_snapshots(Chain, 1)),
+    {ok, Snapshot} = blockchain:get_snapshot(SnapHash, Chain),
+    ok = blockchain_worker:install_snapshot(SnapHash, Snapshot),
+    [clique_status:text(io_lib:format("Loading snapshot from latest available block with re-validation: ~p\n", [Height]))];
 snapshot_load_height(["snapshot", "load-height", BH], [], []) ->
     Chain = blockchain_worker:blockchain(),
     {ok, Block} = blockchain:get_block(list_to_integer(BH), Chain),
@@ -233,8 +241,8 @@ snapshot_load_height(["snapshot", "load-height", BH], [], [{revalidate, _}]) ->
             Text = io_lib:format("No snapshot at block height: ~p", [BH]),
             [clique_status:alert([clique_status:text(Text)])];
         Hash ->
-            ok = application:set_env(blockchain, force_resync_validation, true),
             ok = blockchain_worker:pause_sync(),
+            ok = application:set_env(blockchain, force_resync_validation, true),
             {ok, Snap} = blockchain:get_snapshot(Hash, Chain),
             ok = blockchain_worker:install_snapshot(Hash, Snap),
             [clique_status:text(io_lib:format("Loading snapshot from block_height: ~p with re-validation\n", [BH]))]
