@@ -159,9 +159,9 @@ calculate_rewards(Start, End, Chain) ->
     Vars = get_reward_vars(Start, End, Ledger),
     %% Previously, if a state_channel closed in the grace blocks before an
     %% epoch ended, then it wouldn't ever get rewarded.
-    PreviousGraceBlockDCRewards = collect_dc_rewards_from_previous_epoch_grace(Start, End,
-                                                                               Chain, Vars,
-                                                                               Ledger),
+    {ok, PreviousGraceBlockDCRewards} = collect_dc_rewards_from_previous_epoch_grace(Start, End,
+                                                                                     Chain, Vars,
+                                                                                     Ledger),
     case get_rewards_for_epoch(Start, End, Chain, Vars, Ledger, PreviousGraceBlockDCRewards) of
         {error, _Reason}=Error ->
             Error;
@@ -681,13 +681,19 @@ normalize_witness_rewards(WitnessRewards, #{epoch_reward := EpochReward,
         WitnessRewards
     ).
 
+-spec collect_dc_rewards_from_previous_epoch_grace(non_neg_integer(), non_neg_integer(),
+                                                   blockchain:blockchain(), map(),
+                                                   blockchain_ledger_v1:ledger()) ->
+    {ok, map()} | {error, any()}.
 collect_dc_rewards_from_previous_epoch_grace(Start, End, Chain,
                                              #{sc_grace_blocks := Grace,
-                                               reward_version := 4} = Vars, Ledger) ->
+                                               reward_version := RV} = Vars,
+                                             Ledger) when RV > 3 ->
     scan_grace_block(Start - Grace, Start, End, Vars, Chain, Ledger, #{});
-collect_dc_rewards_from_previous_epoch_grace(_Start, _End, _Chain, _Vars, _Ledger) -> #{}.
+collect_dc_rewards_from_previous_epoch_grace(_Start, _End, _Chain, _Vars, _Ledger) -> {ok, #{}}.
 
-scan_grace_block(Current, Start, _End, _Vars, _Chain, _Ledger, Acc) when Current == Start + 1 -> Acc;
+scan_grace_block(Current, Start, _End, _Vars, _Chain, _Ledger, Acc)
+                                           when Current == Start + 1 -> {ok, Acc};
 scan_grace_block(Current, Start, End, Vars, Chain, Ledger, Acc) ->
     case blockchain:get_block(Current, Chain) of
         {error, _Error} = Err ->
