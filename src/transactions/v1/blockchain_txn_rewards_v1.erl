@@ -689,7 +689,7 @@ collect_dc_rewards_from_previous_epoch_grace(Start, End, Chain,
                                              #{sc_grace_blocks := Grace,
                                                reward_version := RV} = Vars,
                                              Ledger) when RV > 3 ->
-    scan_grace_block(Start - Grace, Start, End, Vars, Chain, Ledger, #{});
+    scan_grace_block(max(1, Start - Grace), Start, End, Vars, Chain, Ledger, #{});
 collect_dc_rewards_from_previous_epoch_grace(_Start, _End, _Chain, _Vars, _Ledger) -> {ok, #{}}.
 
 scan_grace_block(Current, Start, _End, _Vars, _Chain, _Ledger, Acc)
