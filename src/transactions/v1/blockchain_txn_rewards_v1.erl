@@ -688,7 +688,7 @@ normalize_witness_rewards(WitnessRewards, #{epoch_reward := EpochReward,
 collect_dc_rewards_from_previous_epoch_grace(Start, End, Chain,
                                              #{sc_grace_blocks := Grace,
                                                reward_version := RV} = Vars,
-                                             Ledger) when RV > 3 ->
+                                             Ledger) when RV > 4 ->
     scan_grace_block(max(1, Start - Grace), Start, End, Vars, Chain, Ledger, #{});
 collect_dc_rewards_from_previous_epoch_grace(_Start, _End, _Chain, _Vars, _Ledger) -> {ok, #{}}.
 
